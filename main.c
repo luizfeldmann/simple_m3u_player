@@ -20,6 +20,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+#include <libgen.h>
 #include <gtk/gtk.h>    // sudo apt install libgtk-3-dev
 #include <gdk/gdkx.h>
 #include <curl/curl.h>  // sudo apt install libcurl4-openssl-dev
@@ -384,6 +386,8 @@ FILE* cache_or_download_file(const char* url)
             remove(file_name);
             return NULL;
         }
+        else
+            printf("\n%s ==> %s", url, file_name);
 
         // download succeeded - file is now cached
         goto open_cached;
@@ -597,7 +601,7 @@ int main(int argc, char** argv)
     // sanity check
     if (argc != 2)
     {
-        fprintf(stderr, "Usage: %s filename.m3u", argv[0]);
+        fprintf(stderr, "\nUsage: %s filename.m3u\n", argv[0]);
         return EINVAL;
     }
 
@@ -631,14 +635,40 @@ int main(int argc, char** argv)
         fprintf(stderr, "\ngtk_css_provider_new failed\n");
         return -1;
     }
+    
+    // get path to player directory
+    char self_path[256] = { 0 };
+    int nchar = readlink("/proc/self/exe", self_path, sizeof(self_path));
+    
+    if (nchar <= 0 || nchar >  sizeof(self_path))
+    {
+        fprintf(stderr, "\nCannot obtain path to player directory\n");
+        return EINVAL;
+    }
+    
+    // get path to GTK layout file and CSS theme file
+    char layout_path[256];
+    char style_path[256];
+    char *cdirdup1 = strdup(self_path);
+    char *cdirdup2 = strdup(self_path); 
+    sprintf(layout_path, "%s/layout.glade", dirname(cdirdup1));
+    sprintf(style_path,  "%s/theme.css",    dirname(cdirdup2));
+    free(cdirdup1);
+    free(cdirdup2);
 
-    gtk_css_provider_load_from_path(css, "theme.css", NULL);
+    // build GTK interface
+    if (gtk_css_provider_load_from_path(css, style_path, NULL) != TRUE)
+    {
+        fprintf(stderr, "\nCould not load CSS theme file from %s\n", style_path);
+        return ENOENT;
+    }
+    
     gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_USER);
 
-    builder = gtk_builder_new_from_file("layout.glade");
+    builder = gtk_builder_new_from_file(layout_path);
     if (builder == NULL)
     {
-        fprintf(stderr, "\ngtk_builder_new_from_file failed\n");
+        fprintf(stderr, "\ngtk_builder_new_from_file failed loading %s\n", layout_path);
         return -1;
     }
 

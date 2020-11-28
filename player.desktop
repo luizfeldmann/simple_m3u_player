@@ -1,0 +1,4 @@
+[Desktop Entry]
+Type=Application
+Name=IPTV PLAYER
+Exec=/home/osmc/player/player /home/osmc/X/minhalista.m3u
